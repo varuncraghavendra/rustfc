@@ -1,0 +1,120 @@
+How to setup Rust on VSCode to run ESP32-C3 DevKit-RUST Board from Scratch : 
+
+Create a workspace like this
+
+/Add Image Here/
+
+To get started with Rust on the ESP32-C3 DevKit, you'll need to set up the environment and dependencies. Here's a step-by-step guide:
+
+
+1. Setup the rustup and cargo commands in your zsh shell by following these steps: 
+
+code ~/.zshrc
+. "$HOME/.cargo/env"            # For sh/bash/zsh/ash/dash/pdksh
+source ~/.zshrc
+
+
+NOTE : If you get this error
+zsh: command not found: code
+It seems like the `code` command for Visual Studio Code is not available in your terminal. You can enable it by following these steps:
+
+Do the following :
+
+1. **Open Visual Studio Code.**
+
+2. **Press `Cmd+Shift+P` to open the Command Palette.**
+
+3. **Type `Shell Command: Install 'code' command in PATH` and press Enter.**
+
+After doing this, you should be able to use the `code` command in your terminal. Now, you can open your `.zshrc` file:
+
+```sh
+code ~/.zshrc
+```
+
+Add the following line to the end of the file:
+
+```sh
+. "$HOME/.cargo/env"            # For sh/bash/zsh/ash/dash/pdksh
+```
+
+Save the file and then source it to apply the changes:
+
+```sh
+source ~/.zshrc
+```
+
+This should make the `rustup` and `cargo` commands available in your `zsh` shell.
+
+2. Now, Install Rust and necessary tools by running the followign commands : 
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup target add riscv32imc-unknown-none-elf
+cargo install cargo-generate
+cargo install ldproxy
+```
+
+3. Setup Homebrew to further setup cargo-generate : 
+
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+brew install pkg-config openssl
+
+export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig
+
+echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig' >> ~/.zshrc
+
+- Run these commands in your terminal to add Homebrew to your PATH:
+    echo >> /Users/varunchandrashekarraghavendra/.zprofile
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> /Users/varunchandrashekarraghavendra/.zprofile
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+
+source ~/.zshrc
+
+cargo install cargo-generate
+
+After installing cargo-generate, you can proceed with generating the project and setting up the example code as previously described. 
+
+NOTE : If there are still persistent issues with 'cargo-generate', then follow these steps to reinstall 'cargo-generate'
+
+Reconfirm the installation of Rust and necessary tools:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustup target add riscv32imc-unknown-none-elf
+```
+
+Install Homebrew (if not already installed):
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+Install pkg-config and OpenSSL:
+brew install pkg-config openssl
+
+Set the PKG_CONFIG_PATH environment variable:
+export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig
+
+Add the PKG_CONFIG_PATH to your .zshrc file:
+echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig' >> ~/.zshrc
+source ~/.zshrc
+
+Try to install cargo-generate again:
+cargo install cargo-generate
+
+4. Setup the project : 
+
+cargo generate --git https://github.com/esp-rs/esp-idf-template cargo
+
+Then, answer the following prompts to select the following answers 
+NOTE : You can name the project as you wish...
+
+/Add Image Here/
+
+5. Add these lines to the 'Cargo.toml' file to include necessary dependencies : 
+
+[dependencies]
+esp-idf-sys = "0.30.0"
+esp-idf-hal = "0.30.0"
+
+6. 

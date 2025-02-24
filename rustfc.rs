@@ -1,7 +1,5 @@
-use esp_idf_hal::prelude::*;
-use esp_idf_hal::gpio::{Input, Output, PinDriver, GpioPin};
-use esp_idf_sys as _;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use std::thread::sleep;
 
 const R2D: f32 = 57.29578;
 const D2R: f32 = 0.0174533;
@@ -91,7 +89,7 @@ impl UAV {
 
     fn setup(&mut self) {
         println!("Initializing UAV...");
-        esp_idf_hal::delay::FreeRtos::vTaskDelay(1000); // equivalent to sleep(Duration::from_secs(1))
+        sleep(Duration::from_secs(5));
         self.calibrate_imu();
         self.loop_timer = Instant::now();
     }
@@ -103,24 +101,104 @@ impl UAV {
 
     fn read_raw_imu(&mut self) {
         println!("Reading raw IMU data...");
-        // Add IMU reading logic here (e.g., from I2C or SPI sensor)
+    }
+
+    fn pid_controller(
+        &mut self,
+        setpoint: f32,
+        current_angle: f32,
+        rate_of_change: f32,
+        axis: &str,
+    ) -> f32 {
+        let error = setpoint - current_angle;
+        let rate_error = -rate_of_change; // Negative sign to compensate for rate direction
+        
+        // Determine which PID constants to use based on the axis
+        let (kp, ki, kd, prev_error, integrator, prev_integral) = match axis {
+            "roll" => (
+                KP_ROLL,
+                KI_ROLL_RATE,
+                KD_ROLL_RATE,
+                &mut self.pid_prev_error_euler[0],
+                &mut self.pid_integrator_euler[0],
+                &mut self.pid_prev_error_euler[0],
+            ),
+            "yaw" => (
+                KP_YAW_RATE,
+                KI_YAW_RATE,
+                KD_YAW_RATE,
+                &mut self.pid_prev_error_euler[1],
+                &mut self.pid_integrator_euler[1],
+                &mut self.pid_prev_error_euler[1],
+            ),
+            _ => panic!("Invalid axis for PID controller"),
+        };
+
+        // Proportional term
+        let p_term = kp * error;
+
+        // Integral term
+        *integrator += error;
+        let i_term = ki * *integrator;
+
+        // Derivative term
+        let d_term = kd * rate_error;
+
+        // PID output
+        let pid_output = p_term + i_term + d_term;
+
+        // Limit the output to prevent saturation
+        let pid_output = pid_output.clamp(-PID_MAX_OUTPUT, PID_MAX_OUTPUT);
+
+        // Update the previous error and integrator for the next cycle
+        *prev_error = error;
+        *prev_integral = *integrator;
+
+        pid_output
     }
 
     fn loop_iteration(&mut self) {
+        // Example setpoints (you can modify these based on your logic)
+        let roll_setpoint: f32 = 0.0;  // Target roll angle (e.g., level flight)
+        let pitch_setpoint: f32 = 0.0; // Target pitch angle
+        let yaw_setpoint: f32 = 0.0;   // Target yaw angle
+
+        // Read raw IMU data
         self.read_raw_imu();
+
+        // Calculate the current roll, pitch, yaw from the IMU data
+        let roll_angle = self.euler_angles[0];  // Roll angle from gyro/accelerometer
+        let yaw_angle = self.euler_angles[1];   // Yaw angle from gyro/accelerometer
+        let roll_rate = self.gyro_data[0];       // Roll rate from gyro
+        let yaw_rate = self.gyro_data[2];        // Yaw rate from gyro
+
+        // Use PID controller for each axis
+        let roll_pid = self.pid_controller(roll_setpoint, roll_angle, roll_rate, "roll");
+        let yaw_pid = self.pid_controller(yaw_setpoint, yaw_angle, yaw_rate, "yaw");
+
+        // Apply the PID outputs to control the motors (ESCs)
+        self.esc_pwm[0] += roll_pid as i32; // For simplicity, applying directly
+        self.esc_pwm[1] -= roll_pid as i32;
+        self.esc_pwm[2] -= yaw_pid as i32;
+        self.esc_pwm[3] += yaw_pid as i32;
+
+        // Print debug info
+        println!("Roll PID: {}", roll_pid);
+        println!("Yaw PID: {}", yaw_pid);
+
         let elapsed = self.loop_timer.elapsed().as_micros();
         println!("Loop iteration: {} µs", elapsed);
+
+        // Reset loop timer
         self.loop_timer = Instant::now();
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    esp_idf_sys::link_patches();
-
+fn main() {
     let mut uav = UAV::new();
     uav.setup();
     loop {
         uav.loop_iteration();
-        esp_idf_hal::delay::FreeRtos::vTaskDelay((1000 / LOOP_RATE) as u32); // equivalent to sleep(Duration::from_millis(1000 / LOOP_RATE))
+        sleep(Duration::from_millis(1000 / LOOP_RATE));
     }
 }

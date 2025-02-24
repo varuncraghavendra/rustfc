@@ -1,5 +1,7 @@
-use std::time::{Duration, Instant};
-use std::thread::sleep;
+use esp_idf_hal::prelude::*;
+use esp_idf_hal::gpio::{Input, Output, PinDriver, GpioPin};
+use esp_idf_sys as _;
+use std::time::Instant;
 
 const R2D: f32 = 57.29578;
 const D2R: f32 = 0.0174533;
@@ -89,7 +91,7 @@ impl UAV {
 
     fn setup(&mut self) {
         println!("Initializing UAV...");
-        sleep(Duration::from_secs(5));
+        esp_idf_hal::delay::FreeRtos::vTaskDelay(1000); // equivalent to sleep(Duration::from_secs(1))
         self.calibrate_imu();
         self.loop_timer = Instant::now();
     }
@@ -101,6 +103,7 @@ impl UAV {
 
     fn read_raw_imu(&mut self) {
         println!("Reading raw IMU data...");
+        // Add IMU reading logic here (e.g., from I2C or SPI sensor)
     }
 
     fn loop_iteration(&mut self) {
@@ -111,11 +114,13 @@ impl UAV {
     }
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    esp_idf_sys::link_patches();
+
     let mut uav = UAV::new();
     uav.setup();
     loop {
         uav.loop_iteration();
-        sleep(Duration::from_millis(1000 / LOOP_RATE));
+        esp_idf_hal::delay::FreeRtos::vTaskDelay((1000 / LOOP_RATE) as u32); // equivalent to sleep(Duration::from_millis(1000 / LOOP_RATE))
     }
 }
